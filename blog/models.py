@@ -1,6 +1,33 @@
 from django.db import models
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.db.models import Count
+
+
+class TagQuerySet(models.QuerySet):
+    def popular(self, ):
+        return self.annotate(taged_amount=Count('posts')).order_by('-taged_amount')
+
+class PostQuerySet(models.QuerySet):
+    def popular(self, ):
+        posts = self.annotate(likes_amount=Count('likes'))
+        most_popular_posts = posts.order_by('-likes_amount')
+        return most_popular_posts
+
+    def fetch_with_comments_count(self):
+        most_popular_posts_ids = [post.id for post in self]
+
+        posts_with_comments = Post.objects.filter(id__in=most_popular_posts_ids).annotate(
+            comments_amount=Count('comments'))
+
+        ids_and_comments = posts_with_comments.values_list('id', 'comments_amount')
+        count_for_id = dict(ids_and_comments)
+
+        for post in self:
+            post.comments_amount = count_for_id[post.id]
+
+        return list(self)
+
 
 
 class Post(models.Model):
@@ -13,6 +40,8 @@ class Post(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Автор", limit_choices_to={'is_staff': True})
     likes = models.ManyToManyField(User, related_name="liked_posts", verbose_name="Кто лайкнул", blank=True)
     tags = models.ManyToManyField("Tag", related_name="posts", verbose_name="Теги")
+
+    objects = PostQuerySet.as_manager()
 
     def __str__(self):
         return self.title
@@ -30,6 +59,8 @@ class Post(models.Model):
 class Tag(models.Model):
     title = models.CharField("Тег", max_length=20, unique=True)
 
+    objects = TagQuerySet.as_manager()
+
     def __str__(self):
         return self.title
 
@@ -39,6 +70,7 @@ class Tag(models.Model):
     def get_absolute_url(self):
         return reverse('tag_filter', args={'tag_title': self.slug})
 
+
     class Meta:
         ordering = ["title"]
         verbose_name = 'тег'
@@ -46,7 +78,7 @@ class Tag(models.Model):
 
 
 class Comment(models.Model):
-    post = models.ForeignKey("Post", on_delete=models.CASCADE, verbose_name="Пост, к которому написан")
+    post = models.ForeignKey("Post", on_delete=models.CASCADE, related_name="comments", verbose_name="Пост, к которому написан")
     author = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Автор")
 
     text = models.TextField("Текст комментария")
@@ -59,3 +91,5 @@ class Comment(models.Model):
         ordering = ['published_at']
         verbose_name = 'комментарий'
         verbose_name_plural = 'комментарии'
+
+
