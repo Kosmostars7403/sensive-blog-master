@@ -8,6 +8,7 @@ class TagQuerySet(models.QuerySet):
     def popular(self, ):
         return self.annotate(taged_amount=Count('posts')).order_by('-taged_amount')
 
+
 class PostQuerySet(models.QuerySet):
     def popular(self, ):
         posts = self.annotate(likes_amount=Count('likes'))
