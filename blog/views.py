@@ -32,9 +32,11 @@ def serialize_post_optimized(post):
 
 
 def serialize_tag_optimized(tag):
+    posts_with_tags = Post.objects.filter(tags__title=tag.title).prefetch_related(Prefetch('tags',
+                                                                                          queryset=Tag.objects.annotate(taged_amount=Count('posts'))))
     return {
         'title': tag.title,
-        'posts_with_tag': Post.objects.filter(tags__title=tag.title).prefetch_related(Prefetch('taged_amount', queryset=Post.objects.annotate(taged_amount=Count('tags')))),
+        'posts_with_tag': posts_with_tags,
     }
 
 
